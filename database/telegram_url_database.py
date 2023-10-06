@@ -44,5 +44,3 @@ class TelegramURLDatabase:
     def close(self):
         self.conn.close()
 
-
-tele_url_db = TelegramURLDatabase()

@@ -52,6 +52,3 @@ class UserDatabase:
 
     def close(self):
         self.conn.close()
-
-
-user_db = UserDatabase()
