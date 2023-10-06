@@ -1,18 +1,20 @@
 import datetime
 import telegram
-
-import sqlite3
 import time
 import re
 import requests
+from database.user_database import UserDatabase
+from database.telegram_url_database import TelegramURLDatabase
 from lxml import etree
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram import Update
-
 from telegram.ext import Updater, CommandHandler, MessageHandler, CallbackContext, filters,CallbackQueryHandler
 from telegram.ext import *
 from telegram.constants import ParseMode
 from prettytable import PrettyTable
+
+user_db = UserDatabase()
+tele_url_db = TelegramURLDatabase()
 
 last_page_click = {}
 admin_user = [6191802331]
@@ -79,111 +81,6 @@ def get_telegram_info(url):
             return url, title, members_count, group_type
     except requests.exceptions.RequestException as e:
         return False
-
-
-
-# Create UserDatabase class
-class UserDatabase:
-    def __init__(self, db_name='user_data.db'):
-        self.conn = sqlite3.connect(db_name)
-        self.cursor = self.conn.cursor()
-        self.create_table()
-
-    def create_table(self):
-        self.cursor.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                user_id INTEGER PRIMARY KEY,
-                username TEXT,
-                is_blacklisted INTEGER
-            )
-        ''')
-        self.conn.commit()
-    def get_user_info(self, user_id):
-        self.cursor.execute('SELECT * FROM users WHERE user_id = ?', (user_id,))
-        return self.cursor.fetchone()
-    
-    def get_user_info_all(self, limit=10):
-        query = 'SELECT * FROM users'
-        if limit is not None:
-            query += ' LIMIT ?'
-            self.cursor.execute(query, (limit,))
-        else:
-            self.cursor.execute(query)
-        return self.cursor.fetchall()
-    
-    
-    def add_user(self, user_id, username):
-        self.cursor.execute('INSERT INTO users (user_id, username, is_blacklisted) VALUES (?, ?, 0)', (user_id, username))
-        self.conn.commit()
-    
-    def user_exists(self, user_id):
-        self.cursor.execute('SELECT COUNT(*) FROM users WHERE user_id = ?', (user_id,))
-        result = self.cursor.fetchone()
-        return result and result[0] > 0
-
-    def is_blacklisted(self, user_id):
-        self.cursor.execute('SELECT is_blacklisted FROM users WHERE user_id = ?', (user_id,))
-        result = self.cursor.fetchone()
-        return result and result[0] == 1
-
-    def blacklist_user(self, user_id):
-        self.cursor.execute('UPDATE users SET is_blacklisted = 1 WHERE user_id = ?', (user_id,))
-        self.conn.commit()
-
-    def unblacklist_user(self, user_id):
-        self.cursor.execute('UPDATE users SET is_blacklisted = 0 WHERE user_id = ?', (user_id,))
-        self.conn.commit()
-
-    def close(self):
-        self.conn.close()
-class TelegramURLDatabase:
-    def __init__(self, db_name='telegram_URL.db'):
-        self.conn = sqlite3.connect(db_name)
-        self.cursor = self.conn.cursor()
-        
-    def search_users_by_name(self, name, page, page_size=10):
-        offset = (page - 1) * page_size
-        query = 'SELECT * FROM telegram WHERE name LIKE ? LIMIT ?, ?'
-        self.cursor.execute(query, ('%' + name + '%', offset, page_size))
-        results = self.cursor.fetchall()
-        has_more = len(results) == page_size
-        return results, has_more
-    
-    def insert_record(self, name, telegram_url, type, time, number):
-        """
-        向数据库中插入一条记录.
-        
-        Args:
-            name (str): 名称.
-            telegram_url (str): Telegram URL.
-            type (str): 类型.
-            time (str): 时间.
-            number (str): 数字.
-        """
-        # 使用参数化查询来插入数据
-        query = "INSERT INTO telegram (name, telegram_url, type, time, number) VALUES (?, ?, ?, ?, ?)"
-        values = (name, telegram_url, type, time, number)
-        self.cursor.execute(query, values)
-        self.conn.commit()  # 修复此行,将self.connection改为self.conn
-        return 
-    def search_record_by_telegram_url(self, telegram_url):
-        query = "SELECT * FROM telegram WHERE telegram_url = ?"
-        self.cursor.execute(query, (telegram_url,))
-        results = self.cursor.fetchone()
-        return results
-    def get_data_by_page_and_name(self, page_id, name):
-        items_per_page = 10
-        offset = (page_id - 1) * items_per_page
-        query = 'SELECT * FROM telegram WHERE name LIKE ? LIMIT ?, ?'
-        self.cursor.execute(query, ('%' + name + '%', offset, items_per_page))
-        results = self.cursor.fetchall()
-        return results
-
-    def close(self):
-        self.conn.close()
-
-user_db = UserDatabase()
-tele_url_db = TelegramURLDatabase()
 
 async def start(update: Update, context: CallbackContext):
     user = update.effective_user
