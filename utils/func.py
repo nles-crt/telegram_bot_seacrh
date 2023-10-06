@@ -1,6 +1,7 @@
 import requests
-
-
+from lxml import etree
+from prettytable import PrettyTable
+import re
 def format_large_numbers(number):
     if number >= 1000:
         formatted_number = "{:.1f}k".format(number / 1000)

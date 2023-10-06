@@ -2,16 +2,14 @@ import datetime
 import telegram
 import time
 import re
-import requests
+import utils.func as func
 from database.user_database import UserDatabase
 from database.telegram_url_database import TelegramURLDatabase
-from lxml import etree
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram import Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, CallbackContext, filters,CallbackQueryHandler
 from telegram.ext import *
 from telegram.constants import ParseMode
-from prettytable import PrettyTable
 
 user_db = UserDatabase()
 tele_url_db = TelegramURLDatabase()
@@ -62,7 +60,7 @@ async def add_url(update: Update, context: CallbackContext):
     else:
         try:
             # 获取 Telegram 信息
-            info = get_telegram_info(vuln)
+            info = func.get_telegram_info(vuln)
             if info:
                 url, title, members_count, group_type = info
                 current_date = datetime.date.today()
@@ -88,13 +86,13 @@ async def managementInformation(update: Update, context: CallbackContext):
         if command == '/admin' and args:
             if args == "s":
                 limit = vuln[0] if vuln else 10
-                user_data = parse_user_data(user_db.get_user_info_all(limit))
+                user_data = func.parse_user_data(user_db.get_user_info_all(limit))
                 print(user_data)
                 await context.bot.send_message(chat_id=user_id, text=f"{user_data}")
             elif args == "u":
                 if vuln:
                         administrator_Notifications = vuln[0]
-                        user_data = parse_query_result_to_dict(user_db.get_user_info_all(limit=None))
+                        user_data = func.parse_query_result_to_dict(user_db.get_user_info_all(limit=None))
                         print(user_data)
                         for user_info in user_data:
                             try:
@@ -139,7 +137,7 @@ async def button_click(update, context):
         return
 
     getdata, has_more = tele_url_db.search_users_by_name(name, page=i)
-    getdata = organize_data(getdata)
+    getdata = func.organize_data(getdata)
 
     keyboard = [
         [InlineKeyboardButton(f"上一页", callback_data=f"button1")],
@@ -171,7 +169,7 @@ async def handle_message(update: Update, context: CallbackContext):
     with open('user_info.txt', 'a') as file:
         file.write(f"User ID: {user_id}, User Name: {user_name}, User Message: {user_message}\n")
     data, lendata = tele_url_db.search_users_by_name(user_message,1)
-    data = organize_data(data)
+    data = func.organize_data(data)
     if lendata:
         keyboard = [[
                      InlineKeyboardButton("下一页", callback_data="button2")]]

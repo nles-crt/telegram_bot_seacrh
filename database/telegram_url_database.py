@@ -1,3 +1,4 @@
+import sqlite3
 class TelegramURLDatabase:
     def __init__(self, db_name='telegram_URL.db'):
         self.conn = sqlite3.connect(db_name)
