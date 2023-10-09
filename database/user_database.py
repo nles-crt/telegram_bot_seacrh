@@ -1,6 +1,7 @@
 import sqlite3
+from system import user_db
 class UserDatabase:
-    def __init__(self, db_name='user_data.db'):
+    def __init__(self, db_name=user_db):
         self.conn = sqlite3.connect(db_name)
         self.cursor = self.conn.cursor()
         self.create_table()
@@ -27,7 +28,36 @@ class UserDatabase:
             self.cursor.execute(query)
         return self.cursor.fetchall()
     
+    def get_url(self, id):
+        sql_query = "SELECT * FROM 'main'.'link_data' WHERE id = ?"
+        self.cursor.execute(sql_query, (id,))
+        return self.cursor.fetchone()
+
+    def update_user_page(self, eid, operation=None):
+        if operation is None:
+            return "传入参数错误"
+        if operation == 1:
+            sql_query = "UPDATE main.user_page SET pageid = pageid + 1 WHERE eid = ?"
+        elif operation == 0:
+            sql_query = "UPDATE main.user_page SET pageid = pageid - 1 WHERE eid = ?"
+        self.cursor.execute(sql_query, (eid,))
+        self.conn.commit()
+        return
+
     
+
+    def get_user_page(self,eid):
+        sql_query = "SELECT * FROM 'main'.'user_page' WHERE eid = ?"
+        self.cursor.execute(sql_query, (eid,))
+        return self.cursor.fetchone()
+
+    def add_user_page(self,eid,pageid,text,type,count):
+        type = "all"
+        sql_query = "INSERT INTO user_page (eid,pageid,text,type,count) VALUES (?,?,?,?,?)"
+        self.cursor.execute(sql_query, (eid,pageid,text,type,count))
+        self.conn.commit()
+        return
+
     def add_user(self, user_id, username):
         self.cursor.execute('INSERT INTO users (user_id, username, is_blacklisted) VALUES (?, ?, 0)', (user_id, username))
         self.conn.commit()

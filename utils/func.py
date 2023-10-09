@@ -2,6 +2,11 @@ import requests
 from lxml import etree
 from prettytable import PrettyTable
 import re
+from database.user_database import UserDatabase
+from bs4 import BeautifulSoup
+import requests
+user_db = UserDatabase()
+
 def format_large_numbers(number):
     if number >= 1000:
         formatted_number = "{:.1f}k".format(number / 1000)
@@ -11,14 +16,15 @@ def format_large_numbers(number):
 
 def organize_data(data_list):
     formatted_data = []
+    i = 0
     for item in data_list:
+        i +=1    
         name, link, category, date, members = item
-        members = format_large_numbers(members)
         if "channel" in category:
             category = "📢"
         else:
             category = "👥"
-        formatted_entry = f"{category if category else 'N/A'}[{name} -{members if members else 'N/A'}]({link})"
+        formatted_entry = f"{i},{category}[{name} -{members}]({link})"
         formatted_data.append(formatted_entry)
     result = '\n'.join(formatted_data)
     return result
@@ -113,3 +119,73 @@ def get_telegram_info(url):
             return url, title, members_count, group_type
     except requests.exceptions.RequestException as e:
         return False
+    
+
+
+def remove_span_tags_and_keep_text(input_string):
+    soup = BeautifulSoup(input_string, 'html.parser')
+    text_without_span = soup.get_text()
+    return text_without_span
+
+def get_data_for_kw_and_page(kw, page=1):
+    base_url = "https://tgscan.xyz/api/search/query"
+    params = {"kw": kw, "p": page, "t": ""}
+    results = []
+    headers = {"User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36"}
+    with requests.Session() as session:
+        response = session.get(base_url, params=params, headers=headers)
+        data = response.json()["doc"]
+        totalPage = response.json()["totalPage"]
+
+        for idata in data:
+            if "MESSAGE" in idata["type"]:
+
+                idata["memberCnt"] = "消息内容"
+                idata["highlighting"]["name"] = idata["highlighting"]["title"]
+                #报错修复未测试
+                idata["link"] = user_db.get_url(idata["chatId"])[1]+"/"+str(idata["offset"])
+            result_dict = {
+                "type": idata["type"],
+                "memberCnt": idata["memberCnt"],
+                "name": remove_span_tags_and_keep_text(idata["highlighting"]["name"]),
+                "link": idata["link"]
+            }
+            results.append(result_dict)
+        results.append({"totalPage": totalPage})
+    return results
+
+def remove_special_characters(input_string):
+    """
+    过滤字符串中的特殊字符.
+
+    参数:
+    - input_string: 输入字符串
+
+    返回值:
+    - 过滤后的字符串
+    """
+    # 使用正则表达式匹配特殊字符并替换为空字符串
+    pattern = r'[!@#$%^&*()_+{}\[\]:;<>,.?~\\\/|"\']'
+    filtered_string = re.sub(pattern, '', input_string)
+    
+    return filtered_string
+def dict_to_markdown_links(dictionary_list):
+    markdown_links = []
+    for dictionary in dictionary_list:
+        if "totalPage" in dictionary:
+            continue
+        if "MESSAGE" in dictionary["type"]:
+            memberCnt = "消息内容"
+        else:
+            memberCnt = format_large_numbers(dictionary["memberCnt"])
+        if "CHANNEL" in dictionary["type"]:
+            category = "📢"
+        elif "MESSAGE" in dictionary["type"]:
+            category = "💬"
+        else:
+            category = "👥"
+        formatted_link = f"{category}[{remove_special_characters(dictionary['name'])} -{memberCnt}]({dictionary['link']})"
+        markdown_links.append(formatted_link)
+    markdown_links.append(f"\n{dictionary['totalPage']}")
+    result = "\n".join(markdown_links)
+    return result,True if dictionary['totalPage'] >= 1 else False,dictionary['totalPage']

@@ -1,5 +1,4 @@
 import datetime
-import telegram
 import time
 import re
 import utils.func as func
@@ -10,13 +9,34 @@ from telegram import Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, CallbackContext, filters,CallbackQueryHandler
 from telegram.ext import *
 from telegram.constants import ParseMode
+from system import *
+import time
+user_last_click_time = {}
 
 user_db = UserDatabase()
 tele_url_db = TelegramURLDatabase()
 
-last_page_click = {}
-admin_user = [6191802331]
+def is_frequent_click(user_id, interval_seconds=5):
+    """
+    检查用户是否频繁点击按钮.
 
+    参数:
+    - user_id: 用户的唯一标识符.
+    - interval_seconds: 两次点击之间的最小时间间隔(以秒为单位),默认为10秒.
+
+    返回值:
+    - True:用户频繁点击了按钮.
+    - False:用户未频繁点击按钮.
+    """
+    if user_id in user_last_click_time:
+        last_click_time = user_last_click_time[user_id]
+        current_time = time.time()
+        if current_time - last_click_time < interval_seconds:
+            return True  # 用户频繁点击按钮
+    
+    # 记录最后一次点击时间
+    user_last_click_time[user_id] = time.time()
+    return False  # 用户未频繁点击按钮
 
 
 async def start(update: Update, context: CallbackContext):
@@ -166,7 +186,7 @@ async def handle_message(update: Update, context: CallbackContext):
     user_id = update.message.from_user.id
     user_name = update.message.from_user.username
     context.user_data['name'] = user_message
-    with open('user_info.txt', 'a') as file:
+    with open('user_info.txt', 'a+',encoding="utf8") as file:
         file.write(f"User ID: {user_id}, User Name: {user_name}, User Message: {user_message}\n")
     data, lendata = tele_url_db.search_users_by_name(user_message,1)
     data = func.organize_data(data)
@@ -174,21 +194,89 @@ async def handle_message(update: Update, context: CallbackContext):
         keyboard = [[
                      InlineKeyboardButton("下一页", callback_data="button2")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text(f"当前页码:1\n{data}", disable_web_page_preview=True, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
+        await update.message.reply_text(f"当前页码: 1\n{data}", disable_web_page_preview=True, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
     elif len(data) == 0:
         await context.bot.send_message(chat_id=update.message.chat_id, text=f"太可惜了没有相关频道和群聊", disable_web_page_preview=True, parse_mode=ParseMode.MARKDOWN)
     else:
         await context.bot.send_message(chat_id=update.message.chat_id, text=f"{data}", disable_web_page_preview=True, parse_mode=ParseMode.MARKDOWN)
 
+
 async def error(update: Update, context: CallbackContext):
     await context.bot.send_message(chat_id=update.message.chat_id, text="An error occurred. Please try again later.")
+
+
+def create_pagination_keyboard(has_prev_page=True, has_next_page=True):
+    """
+    创建一个带有上一页和下一页按钮的键盘.
+
+    :param has_prev_page: 是否包含上一页按钮
+    :param has_next_page: 是否包含下一页按钮
+    :return: 一个包含上一页和下一页按钮的InlineKeyboardMarkup对象
+    """
+    keyboard = []
+
+    if has_prev_page:
+        prev_button = InlineKeyboardButton("上一页", callback_data='prev_page')
+        keyboard.append([prev_button])
+
+    if has_next_page:
+        next_button = InlineKeyboardButton("下一页", callback_data='next_page')
+        keyboard.append([next_button])
+
+    return InlineKeyboardMarkup(keyboard)
+
+
+async def pagination_button_click(update: Update, context: CallbackContext):
+    query = update.callback_query
+    await query.answer()
+    data = query.data
+    user_id = update.callback_query.from_user.id
+    if is_frequent_click(user_id):
+        print("您点击得太频繁了,请稍后再试.")
+        return
+    message_id = query.message.message_id
+    if data == 'prev_page':
+            user_db.update_user_page(eid=message_id, operation=0)
+    elif data == 'next_page':
+            user_db.update_user_page(eid=message_id, operation=1)
+    user_mid = user_db.get_user_page(message_id)
+    if user_mid:
+        kw, current_page, max_pages = user_mid[2], user_mid[1], user_mid[4]
+        getdata, trueAndFalse, count = func.dict_to_markdown_links(func.get_data_for_kw_and_page(kw=kw, page=current_page))
+        has_prev_page = current_page > 1
+        has_next_page = current_page < max_pages
+        reply_markup = create_pagination_keyboard(has_prev_page=has_prev_page, has_next_page=has_next_page)
+        await query.message.edit_text(text=f"搜索内容:{user_mid[2]}\n{getdata}\n{user_mid[1]}/{count}", reply_markup=reply_markup, disable_web_page_preview=True, parse_mode=ParseMode.MARKDOWN)
+    else:
+        await query.message.edit_text(text=f"过期:{message_id}")
+
+
+async def search(update: Update, context: CallbackContext):
+    user_message = update.message.text
+    user_id = update.message.from_user.id
+    user_name = update.message.from_user.username
+    if len(user_message.split()) == 2:
+        text = user_message.split()[1]
+        data,trueAndFalse,count = func.dict_to_markdown_links(func.get_data_for_kw_and_page(text))
+        if trueAndFalse:
+            keyboard = create_pagination_keyboard(has_prev_page=False, has_next_page=True)
+            message = await context.bot.send_message(chat_id=update.message.chat_id, text=f"搜索内容:{text}\n{data}\n当前页码为1/{count}", disable_web_page_preview=True, parse_mode=ParseMode.MARKDOWN, reply_markup=keyboard)
+            message_id = message.message_id
+            user_db.add_user_page(eid=message_id,text=text,pageid=1,type="all",count=count)
+        else:
+            await context.bot.send_message(chat_id=update.message.chat_id, text=data, disable_web_page_preview=True, parse_mode=ParseMode.MARKDOWN)
+    else:
+        print("非请求")
 if __name__ == "__main__":
-    token = '5639834148:AAGkn7UoGYVB8uMr6SbQzTnpOhjzWhAvOCk'
     app = ApplicationBuilder().token(token).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help))
+    app.add_handler(CommandHandler("search", search))
     app.add_handler(CommandHandler("add", add_url))
     app.add_handler(CommandHandler("admin", managementInformation))
     app.add_handler(MessageHandler(None,handle_message))
-    app.add_handler(CallbackQueryHandler(button_click))
+# 添加 CallbackQueryHandler 处理程序,使用正则表达式模式匹配
+    app.add_handler(CallbackQueryHandler(button_click, pattern=r'^button\d+$'))
+    app.add_handler(CallbackQueryHandler(pagination_button_click, pattern=r'^(prev_page|next_page)$'))
+
     app.run_polling()

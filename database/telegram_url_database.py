@@ -1,6 +1,7 @@
 import sqlite3
+from system import telegram_db
 class TelegramURLDatabase:
-    def __init__(self, db_name='telegram_URL.db'):
+    def __init__(self, db_name=telegram_db):
         self.conn = sqlite3.connect(db_name)
         self.cursor = self.conn.cursor()
         
@@ -44,4 +45,3 @@ class TelegramURLDatabase:
 
     def close(self):
         self.conn.close()
-
