@@ -29,7 +29,7 @@ class UserDatabase:
         return self.cursor.fetchall()
     
     def get_url(self, id):
-        sql_query = "SELECT * FROM 'main'.'link_data' WHERE id = ?"
+        sql_query = "SELECT * FROM main.link_data WHERE id = ?"
         self.cursor.execute(sql_query, (id,))
         return self.cursor.fetchone()
 
