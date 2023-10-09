@@ -232,7 +232,7 @@ async def pagination_button_click(update: Update, context: CallbackContext):
     data = query.data
     user_id = update.callback_query.from_user.id
     if is_frequent_click(user_id):
-        print("您点击得太频繁了,请稍后再试.")
+        print("您点击得太频繁了,请稍后再试.",user_id)
         return
     message_id = query.message.message_id
     if data == 'prev_page':
