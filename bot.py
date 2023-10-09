@@ -196,7 +196,7 @@ async def handle_message(update: Update, context: CallbackContext):
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(f"当前页码: 1\n{data}", disable_web_page_preview=True, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
     elif len(data) == 0:
-        await context.bot.send_message(chat_id=update.message.chat_id, text=f"太可惜了没有相关频道和群聊", disable_web_page_preview=True, parse_mode=ParseMode.MARKDOWN)
+        await context.bot.send_message(chat_id=update.message.chat_id, text=f"太可惜了没有相关频道和群聊试试\n/search {user_message}")
     else:
         await context.bot.send_message(chat_id=update.message.chat_id, text=f"{data}", disable_web_page_preview=True, parse_mode=ParseMode.MARKDOWN)
 
