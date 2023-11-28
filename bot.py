@@ -50,7 +50,8 @@ async def start(update: Update, context: CallbackContext):
         await update.message.reply_text(text="已经注册输入/help 查看命令吧")
 async def help(update: Update, context: CallbackContext):
     help_text = """
-📄公告当前机器人可任意群聊使用
+📄公告：
+当前机器人是公益机器人可在任意群聊使用
 
 =============================
 禁止🈲🚫色情/暴力/儿童色情/钓鱼/引战/侵权
@@ -129,6 +130,7 @@ async def managementInformation(update: Update, context: CallbackContext):
                                 user_id = user_info.get('id')
                                 await context.bot.send_message(chat_id=user_id, text=f"{administrator_Notifications}")
                             except Exception as e:
+                                
                                 print(f"发送消息失败: {e}")
                                 await context.bot.send_message(chat_id=admin_user[0], text=f"被{user_id}拉黑")
 
@@ -276,7 +278,7 @@ async def search(update: Update, context: CallbackContext):
         else:
             await update.message.reply_text(text=data, disable_web_page_preview=True, parse_mode=ParseMode.MARKDOWN)
     else:
-        print("非请求")
+        await  update.message.reply_text("/search 内容\n/search@Testtherobotabcd_bot 内容")
 if __name__ == "__main__":
     app = ApplicationBuilder().token(token).build()
     app.add_handler(CommandHandler("start", start))
